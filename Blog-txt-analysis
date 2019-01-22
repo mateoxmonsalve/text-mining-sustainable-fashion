@@ -1,0 +1,158 @@
+
+
+library(XML)
+library(bitops)
+library(RCurl)
+
+
+# Download the html document 
+URLstring <- c("http://www.happynewgreen.com/mode-ethique-les-marques-les-moins-cheres/", 
+               "https://www.etpourquoipascoline.fr/2018/09/5-conseils-pour-une-armoire-plus-ethique/", 
+               "http://www.happynewgreen.com/que-penser-de-linitiative-goforgood-des-galeries-lafayette/",
+               "https://www.letiquette-blog.com/nos-enquetes/les-matieres/le-recyclage-dans-la-mode-le-upcycling-ou-le-surcycling/",
+               "https://www.letiquette-blog.com/nos-enquetes/les-matieres/la-mode-ethique-et-les-vetements-en-coton-bio/",
+               "https://www.letiquette-blog.com/nos-conseils-lifestyle/je-choisis-den-rire/top-10-des-cliches-sur-la-mode-ethique/",
+               "https://modelya.fr/",
+               "https://modelya.fr/le-recyclage-des-vetements-pour-une-mode-responsable/",
+               "http://elenasansh.com/2018/04/23/5-manieres-dagir-pendant-la-fashion-revolution-week/",
+               "http://elenasansh.com/2018/02/16/mon-jean-upcycle/")
+htmlblog <- getURL(URLstring, followlocation = TRUE)
+
+htmlblog
+
+# Parse html (Read the html document into an R object) read the html file as a doc
+
+doc = htmlParse(htmlblog, asText=TRUE)
+
+
+
+# Extract only the text with the following structure <font color=red> "\<p>  Text text text \</p>" 
+
+plain.text <- xpathSApply(doc, "//p", xmlValue)
+
+
+# Comments are stored into a vector 
+
+plain.text<-as.vector(plain.text)
+
+
+# Packages 
+
+#library("tm")
+#library("SnowballC")
+#library("wordcloud")
+#library("RColorBrewer")
+
+
+#  Corpus: a collection of text documents: compile all the texts into one to get the sentiment of the webpage
+
+docs <- Corpus(VectorSource(plain.text))
+
+inspect(docs)
+
+
+# Document cleaning 
+
+# Create a transformation function which modifies the content of the corpus
+
+toSpace <- content_transformer(function (x, pattern ) gsub(pattern, " ", x))
+
+
+# Special characters are replaced by white spaces
+
+docs <- tm_map(docs, toSpace, "/")
+docs <- tm_map(docs, toSpace, "@")
+docs <- tm_map(docs, toSpace, "\\|")
+
+
+
+# Document cleaning 
+
+# Convert text to lowercase
+
+docs <- tm_map(docs, content_transformer(tolower))
+
+
+# Delete numbers
+
+docs <- tm_map(docs, removeNumbers)
+
+
+# Delete French stop words
+
+docs <- tm_map(docs, removeWords, stopwords("french"))
+
+
+# Delete your own list of unwanted words
+
+docs <- tm_map(docs, removeWords, c(",","'", "plus","ça","tout","quand","tous",
+                                    "chez","peu","aussi","comme","non","bref","déjà",
+                                    "donc","alors","car","merci","•","\U0001f642",
+                                    "quoi","l","...","dit")) 
+
+
+# Delete punctuation
+
+docs <- tm_map(docs, removePunctuation)
+
+
+# Remove additional empty spaces
+
+docs <- tm_map(docs, stripWhitespace)
+
+
+#  Most frequent terms 
+
+# For each document (in columns, the number of time a terms appears (in rows))
+
+dtm <- TermDocumentMatrix(docs)
+m <- as.matrix(dtm)
+
+
+
+# Most frequent terms in the corpus
+
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+d<-d[2:3349,]
+head(d, 30)
+
+
+
+# <font color=blue> wordcloud </font>
+
+wordcloud(words = d$word, freq = d$freq, min.freq = 5, max.words=100, random.order=FALSE, colors=brewer.pal(10, "Dark2"))
+
+
+
+# Frequent words 
+
+findFreqTerms(dtm, lowfreq = 10)
+
+
+# Word Frequency 
+
+barplot(d[1:10,]$freq, las = 2, names.arg = d[1:10,]$word,col ="lightblue", main ="Most frequent words",ylab = "Word frequencies")
+
+
+
+#  Sentiment Analysis 
+
+# packages
+
+
+#library("tidytext")
+#library("dplyr")
+#library("sentimentr")
+
+
+#  Sentiment Analysis
+
+plain.text2<-paste(plain.text, collapse = "\n")
+sentiment(plain.text2)
+
+plain.text2 %>% 
+  extract_sentiment_terms()
+
+
+sentiment_by(plain.text2)
